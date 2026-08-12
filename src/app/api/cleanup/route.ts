@@ -7,6 +7,7 @@
  * 无数据库，清理基于存储层内的清单。
  */
 import { cleanupOldFiles } from "@/services/storage/lifecycle";
+import { toUserError, USER_STORAGE_ERROR } from "@/services/storage/errors";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,7 @@ export async function GET() {
       message: `本次清理删除 ${result.removed} 个过期文件，清单剩余 ${result.manifestSize} 项。`,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "清理失败。";
-    return Response.json({ ok: false, error: message }, { status: 500 });
+    // 不向用户暴露 token / 环境变量名 / 内部错误细节，统一友好提示
+    return Response.json({ ok: false, error: toUserError(e, USER_STORAGE_ERROR) }, { status: 500 });
   }
 }

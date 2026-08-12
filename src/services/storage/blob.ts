@@ -3,11 +3,11 @@
  * @description Vercel Blob 存储实现（生产驱动）。
  *
  * 通过 @vercel/blob 把文件存到 Vercel 的托管对象存储，适合 Serverless 环境。
- * - save  : put(access:'public') 返回 { url, pathname }，存入 StorageRef.meta。
- * - get   : 取 Blob 元数据（head）后用 fetch 拉取二进制，返回 Buffer。
+ * - save  : put(access:'private') 返回 { url, pathname }，存入 StorageRef.meta。
+ * - get   : 取 Blob 元数据（head）后用 fetch（携带 Bearer token）拉取二进制，返回 Buffer。
  * - delete: del（按 url / pathname）。
- * - 安全：key 使用随机 fileId（不暴露真实文件名路径）；对象默认 public，
- *          依赖「随机 ID 难以猜中 + 生命周期清理」来保护隐私。
+ * - 安全：key 使用随机 fileId（不暴露真实文件名路径）；对象使用 store 的 private access，
+ *          所有读取都在服务端带 token 鉴权，前端无法直接访问私有 url。
  * - token：必须配置 BLOB_READ_WRITE_TOKEN，缺失时给出明确错误。
  *
  * 可注入 client（默认 @vercel/blob 真实实现），便于单测用 mock 驱动。
@@ -65,11 +65,14 @@ export class BlobStorageProvider implements StorageProvider {
   readonly name = "blob";
 
   private client: BlobClient;
-  private fetchFn: (input: string) => Promise<Response>;
+  private fetchFn: (input: string, init?: RequestInit) => Promise<Response>;
 
-  constructor(client?: BlobClient, fetchFn?: (input: string) => Promise<Response>) {
+  constructor(
+    client?: BlobClient,
+    fetchFn?: (input: string, init?: RequestInit) => Promise<Response>
+  ) {
     this.client = client ?? defaultClient();
-    this.fetchFn = fetchFn ?? ((input: string) => fetch(input));
+    this.fetchFn = fetchFn ?? ((input, init) => fetch(input, init));
   }
 
   private token(): string {
@@ -98,7 +101,7 @@ export class BlobStorageProvider implements StorageProvider {
       name,
       body as unknown as Buffer,
       {
-        access: "public",
+        access: "private",
         contentType:
           contentType ||
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -119,7 +122,11 @@ export class BlobStorageProvider implements StorageProvider {
     const key = typeof ref === "string" ? ref : ref.key;
     const fromMeta = typeof ref !== "string" ? (ref.meta?.url as string | undefined) : undefined;
     const metaUrl = fromMeta != null && fromMeta !== "" ? fromMeta : await this.#resolveUrl(key);
-    const res = await this.fetchFn(metaUrl);
+    // private store：blob 对象不能匿名访问，读取时必须携带 token（Bearer）鉴权。
+    // 只把 token 用于服务端到 Vercel 的请求，绝不泄漏给前端 / 响应头。
+    const res = await this.fetchFn(metaUrl, {
+      headers: { Authorization: `Bearer ${this.token()}` },
+    });
     if (!res.ok) {
       throw new Error(`Blob 读取失败(${res.status})：文件可能已过期或被清理。`);
     }
