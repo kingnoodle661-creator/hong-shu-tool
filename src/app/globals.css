@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f7fa;
+  --foreground: #1f2937;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "PingFang SC", "Microsoft YaHei", system-ui, Arial, sans-serif;
+}
+
+/* 面向中老年用户：不使用暗色自动切换，保证清晰可读 */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 大字体基础 */
+html {
+  font-size: 18px;
+}
