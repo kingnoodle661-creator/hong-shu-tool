@@ -12,6 +12,7 @@ import ExcelJS from "exceljs";
 import { saveUpload } from "@/services/uploads";
 import { storage } from "@/services/storage";
 import { excelEngine } from "@/services/excel/processor";
+import { verifyProcessResult } from "@/services/verify/verifier";
 import type { Task } from "@/types/task";
 
 async function buildDup() {
@@ -69,4 +70,22 @@ test("去重：按指定列去重（保留首次出现）", async () => {
   assert.equal(rows.length, 2, "按商品列去重应剩 2 行");
   // 首次出现的“苹果 5”保留
   assert.deepEqual(rows.find((r) => r[0] === "苹果"), ["苹果", "5"]);
+});
+
+test("去重：结果审查对 distinct 不误报「任务未完成」", async () => {
+  const task: Task = {
+    operation: "distinct",
+    groupBy: ["全部列"],
+    calculations: [],
+    keepHeader: true,
+    sheetName: "",
+    options: {},
+  };
+  const { outcome } = await runRows(task);
+  const suite = verifyProcessResult(outcome.preview, outcome.result, task);
+  const taskCheck = suite.checks.find((c) => c.name === "任务完成检查");
+  assert.ok(taskCheck, "应存在任务完成检查项");
+  assert.equal(taskCheck!.result, "通过", "distinct 不应因「全部列」哨兵误报未完成");
+  const money = suite.checks.find((c) => c.name === "金额校验");
+  assert.equal(money!.result, "通过", "distinct 应跳过金额校验并视为通过");
 });

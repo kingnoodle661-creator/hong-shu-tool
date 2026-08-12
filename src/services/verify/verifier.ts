@@ -69,16 +69,28 @@ export function verifyProcessResult(
 
   // 4) 任务完成检查：用户要求的字段是否在结果表头中执行
   // 用 task.groupBy + task.calculations 判断目标列是否出现在结果表头
-  const targetCols = [...task.groupBy, ...task.calculations.map((c) => c.column)];
-  const missingInResult = targetCols.filter((col) => !result.headers.includes(col));
-  checks.push({
-    name: "任务完成检查",
-    result: missingInResult.length === 0 ? "通过" : "未完成",
-    detail:
-      missingInResult.length === 0
-        ? `已执行字段：${targetCols.join("、")}。`
-        : `结果中缺失字段：${missingInResult.join("、")}。`,
-  });
+  // V0.5-A：distinct 的"全部列"是整行去重哨兵值，非真实列名，跳过此项检查。
+  if (task.operation === "distinct") {
+    checks.push({
+      name: "任务完成检查",
+      result: "通过",
+      detail:
+        headersKept
+          ? "已去重并保留原表头。"
+          : "已按需求去重。",
+    });
+  } else {
+    const targetCols = [...task.groupBy, ...task.calculations.map((c) => c.column)];
+    const missingInResult = targetCols.filter((col) => !result.headers.includes(col));
+    checks.push({
+      name: "任务完成检查",
+      result: missingInResult.length === 0 ? "通过" : "未完成",
+      detail:
+        missingInResult.length === 0
+          ? `已执行字段：${targetCols.join("、")}。`
+          : `结果中缺失字段：${missingInResult.join("、")}。`,
+    });
+  }
 
   // ---- V0.3 增强：汇总文案 + 更细粒度说明 ----
   const failure = checks.filter((c) => c.result !== "通过");
