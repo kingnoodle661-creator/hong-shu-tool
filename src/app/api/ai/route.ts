@@ -50,7 +50,14 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    // 未配置/调用失败 -> 服务暂不可用（502）
+    // 未配置 DEEPSEEK_API_KEY -> 明确提示配置缺失（503，不泄露任何密钥细节）
+    if (raw.includes("DEEPSEEK_API_KEY")) {
+      return Response.json(
+        { ok: false, error: "AI服务未配置" },
+        { status: 503 }
+      );
+    }
+    // 其他调用失败（网络/超时/上游错误）-> 服务暂不可用（502）
     return Response.json(
       { ok: false, error: "AI 服务暂不可用，请稍后重试。" },
       { status: 502 }
