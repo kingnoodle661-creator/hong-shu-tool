@@ -13,6 +13,7 @@
  * 可注入 client（默认 @vercel/blob 真实实现），便于单测用 mock 驱动。
  */
 import type { StorageProvider, StorageRef } from "./types";
+import { StorageConfigError, USER_STORAGE_ERROR } from "./errors";
 
 /** @vercel/blob 的 put 返回结构 */
 interface BlobPutResult {
@@ -44,10 +45,11 @@ function defaultClient(): BlobClient {
   };
 }
 
-/** Blob 存根（未配置 token 时抛出的明确错误） */
+/** Blob 存根（未配置 token 时抛出 StorageConfigError：对用户只给友好提示，详情进日志） */
 function tokenizeError(driver: string): never {
-  throw new Error(
-    `未配置 BLOB_READ_WRITE_TOKEN。要将存储驱动设为 "${driver}"，请在 .env.local 或 Vercel 环境变量中设置 BLOB_READ_WRITE_TOKEN。`
+  throw new StorageConfigError(
+    USER_STORAGE_ERROR,
+    `Blob 驱动（${driver}）已启用，但缺少 BLOB_READ_WRITE_TOKEN。请在 .env.local 或 Vercel 环境变量中配置 BLOB_READ_WRITE_TOKEN。`
   );
 }
 

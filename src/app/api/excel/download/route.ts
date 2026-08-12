@@ -6,6 +6,7 @@
  * 读取二进制后作为附件流式返回给客户端。业务层不再直接读取本地文件系统路径。
  */
 import { storage } from "@/services/storage";
+import { toUserError } from "@/services/storage/errors";
 
 export const runtime = "nodejs";
 
@@ -33,10 +34,8 @@ export async function GET(request: Request) {
       },
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "";
-    return Response.json(
-      { ok: false, error: message || "未找到对应文件，可能已过期或被清除。" },
-      { status: 404 }
-    );
+    // 不向用户暴露存储层技术细节（token/环境变量/内部信息），统一友好提示
+    const userError = toUserError(e, "文件不存在或已过期，请重新处理后再下载。");
+    return Response.json({ ok: false, error: userError }, { status: 404 });
   }
 }

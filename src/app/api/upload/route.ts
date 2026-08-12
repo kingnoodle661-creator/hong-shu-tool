@@ -6,6 +6,7 @@
  *          返回 ExcelFile（含 fileId），供后续 AI / Excel / Verify 流程使用。
  */
 import { saveUpload } from "@/services/uploads";
+import { toUserError, USER_STORAGE_ERROR } from "@/services/storage/errors";
 
 /** GET：返回上传配置元信息，供前端提示 */
 export function GET() {
@@ -45,9 +46,14 @@ export async function POST(request: Request) {
 
     return Response.json({ ok: true, file });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "上传失败。";
-    // 校验类错误给 4xx，其余给 500
-    const status = message.includes("格式") || message.includes("大小") ? 400 : 500;
-    return Response.json({ ok: false, error: message }, { status });
+    const message = e instanceof Error ? e.message : "";
+    // 用户可自助解决的校验类错误：保留具体提示（格式/大小/缺文件）
+    if (/缺少文件|格式|大小/.test(message)) {
+      const status = /格式/.test(message) ? 415 : 400;
+      return Response.json({ ok: false, error: message }, { status });
+    }
+    // 存储配置 / 内部错误：不向用户暴露 token、环境变量名或内部细节，
+    // 统一返回友好提示；详细原因记录到服务端日志（Vercel 日志排查）。
+    return Response.json({ ok: false, error: toUserError(e, USER_STORAGE_ERROR) }, { status: 500 });
   }
 }

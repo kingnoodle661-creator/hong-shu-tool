@@ -16,6 +16,30 @@ import { LocalStorageProvider } from "./local";
 import { BlobStorageProvider } from "./blob";
 import type { StorageProvider } from "./types";
 
+/** 记录一次 Blob 启动环境检查告警，避免多次刷新重复刷屏 */
+let blobEnvWarned = false;
+
+/**
+ * 生产环境启动检查：当使用 blob 驱动但未配置 BLOB_READ_WRITE_TOKEN 时，
+ * 输出明确的 [Storage Error] 日志，方便在 Vercel 日志中排查配置遗漏。
+ * 仅打印日志，不抛错（避免因缺 token 导致所有路由在 import 时直接崩溃）。
+ */
+function checkBlobEnv(): void {
+  if (blobEnvWarned) return;
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    blobEnvWarned = true;
+    console.error(
+      [
+        `[Storage Error]`,
+        `Blob模式已开启`,
+        `但缺少BLOB_READ_WRITE_TOKEN`,
+        `请在 Vercel 环境变量（Settings -> Environment Variables）中配置 BLOB_READ_WRITE_TOKEN，或使用 STORAGE_DRIVER=local。`,
+      ].join("\n")
+    );
+  }
+}
+
+
 /** 读取当前生效的驱动名 */
 function resolveDriver(driverArg?: string): string {
   const driver =
@@ -36,6 +60,7 @@ export function createStorageProvider(driverArg?: string): StorageProvider {
     case "local":
       return new LocalStorageProvider();
     case "blob":
+      checkBlobEnv(); // 启动环境检查：缺 token 时输出 [Storage Error] 日志
       return new BlobStorageProvider();
     default:
       throw new Error(`未知的存储驱动：${driver}。可用值：local、blob。`);

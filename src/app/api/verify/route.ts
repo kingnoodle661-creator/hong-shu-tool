@@ -9,6 +9,7 @@
 import { aiReview } from "@/services/ai/deepseek";
 import { verifyProcessResult } from "@/services/verify/verifier";
 import { writeOperationLog } from "@/services/log/logger";
+import { toUserError } from "@/services/storage/errors";
 import type { ProcessSummary, Task, VerificationSuite } from "@/types/task";
 
 interface VerifyRequestBody {
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
 
     return Response.json({ ok: true, verification: programmatic, aiHint });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "审查失败。";
-    return Response.json({ ok: false, error: message }, { status: 500 });
+    // 不向用户暴露内部技术细节（token/环境变量/堆栈），统一友好提示
+    return Response.json({ ok: false, error: toUserError(e, "审查失败，请稍后重试。") }, { status: 500 });
   }
 }

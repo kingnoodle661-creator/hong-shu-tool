@@ -75,7 +75,6 @@ try {
         // 4) 执行
         const exRes = await fetch(`${BASE}/api/excel`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file, task, fieldMap }) });
         const exBody = await exRes.json();
-        const expected = { 苹果: 1600, 香蕉: 300, 橙子: 200 };
         let amountOk = false;
         if (exRes.status === 200 && ok(exBody) && exBody.outcome && exBody.outcome.result) {
           const total = exBody.outcome.result.totalAmount;

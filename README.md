@@ -78,18 +78,23 @@ npm run lint         # ESLint
 ### 1. 导入项目
 Vercel 控制台 → **Add New → Project** → 选择本仓库 → 确认 Framework 为 **Next.js**，构建命令 `npm run build` → **Deploy**。
 
-### 2. 创建 Blob Store 并设置环境变量
-- 在项目页面 → **Storage** → **Create Database/Blob Store** → 选择 **Blob** → 创建。
-- Vercel 会自动注入 `BLOB_READ_WRITE_TOKEN`；若无，到 **Settings → Environment Variables** 手动添加。
-- 在 **Settings → Environment Variables** 添加：
+### 2a. 配置文件存储（Vercel Blob）
+生产环境默认使用 Blob 存储。若未配置 `BLOB_READ_WRITE_TOKEN`，上传会出现如下现象：页面提示「文件存储服务暂时不可用，请稍后重试」（Vercel 日志里会显示 `[Storage Error]` 和 `缺少 BLOB_READ_WRITE_TOKEN`）。按下面 4 步修复：
+
+1. **创建 Vercel Blob**：项目页 → **Storage** → **Create Blob Store** → 选择 **Blob** → **Create**。
+2. **复制 Token**：创建完成后，把 **`BLOB_READ_WRITE_TOKEN`** 的值复制出来（这是读写令牌，仅服务端使用，不要暴露到前端）。
+3. **添加 Environment Variables**：**Settings → Environment Variables** 中添加，并勾选 **Production** 和 **Preview**：
 
 | 变量名 | 值 | 说明 |
 |---|---|---|
-| `DEEPSEEK_API_KEY` | 你的 DeepSeek Key | 必填 |
+| `BLOB_READ_WRITE_TOKEN` | 第 2 步复制的值 | Blob 存储令牌（blob 模式必填）|
+| `DEEPSEEK_API_KEY` | 你的 DeepSeek Key | 必填，用于 AI 理解/审查 |
+| `STORAGE_DRIVER` | `blob` | 生产推荐；未设则 Vercel 自动默认 blob |
 | `DEEPSEEK_MODEL` | `deepseek-chat` | 可选 |
-| `STORAGE_DRIVER` | `blob` | 生产默认 blob，可不设 |
 
-> Vercel 生产会自动识别 `process.env.VERCEL` 并默认使用 `blob` 驱动，`STORAGE_DRIVER` 可不设（本地默认 `local`）。
+4. **重新部署**：保存变量后，到 **Deployments** → 选最近一次 → **Redeploy**，让新环境变量生效。
+
+> 本地开发用 `STORAGE_DRIVER=local`，文件写本地 `./.uploads`，无需 token。
 
 ### 3. 部署
 保存环境变量后 Vercel 自动重新部署。之后通过 `https://<你的项目>.vercel.app` 访问，微信打开该链接即可使用。
