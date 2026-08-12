@@ -20,6 +20,7 @@ function stageIndex(stage: ProcessStage): number {
     case "idle":
       return 0; // 尚无步骤
     case "uploaded":
+    case "analyzing_file":
     case "analyzing":
       return 1;
     case "confirming":

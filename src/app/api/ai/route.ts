@@ -1,10 +1,12 @@
 /**
  * @file route.ts (/api/ai)
- * @description 需求理解 Agent（AI）接口。
+ * @description 需求理解 Agent（AI）接口（V0.5-A 增强）。
  * 流程：接收用户自然语言需求 -> 若提供 fileId 则先读取表头约束模型 ->
- *       调用 deepseek.understandRequirement -> 返回结构化 Task。
+ *       调用 deepseek.understandRequirement -> 返回 ClarifyResult。
+ * 返回：需求足够具体 -> { ok:true, status:"ready", task }；
+ *     需求模糊（如"整理一下"）-> { ok:true, status:"need_confirm", questions }，不报错。
  * 注意：本接口只做「需求理解」，不触碰 Excel 内容。
- * AI 解析失败时返回用户友好的"无法理解您的需求"提示，而不是原始报错。
+ * 网络/上游错误时返回 502，未配置 Key 时返回 503（都不泄露敏感信息）。
  */
 import { understandRequirement } from "@/services/ai/deepseek";
 import { excelEngine } from "@/services/excel/processor";
@@ -38,18 +40,13 @@ export async function POST(request: Request) {
       }
     }
 
-    const task = await understandRequirement(body.requirement.trim(), headers);
+    // V0.5-A：需求理解返回 ClarifyResult。
+    // 需求足够具体 -> { status:"ready", task }；需求模糊 -> { status:"need_confirm", questions }，绝不报错。
+    const result = await understandRequirement(body.requirement.trim(), headers);
 
-    return Response.json({ ok: true, task, headers });
+    return Response.json({ ok: true, ...result, headers });
   } catch (e) {
     const raw = e instanceof Error ? e.message : "";
-    // 无法理解的用户需求 -> 友好提示（400）
-    if (raw.includes("无法理解")) {
-      return Response.json(
-        { ok: false, error: "无法理解您的需求，请换一种描述方式。" },
-        { status: 400 }
-      );
-    }
     // 未配置 DEEPSEEK_API_KEY -> 明确提示配置缺失（503，不泄露任何密钥细节）
     if (raw.includes("DEEPSEEK_API_KEY")) {
       return Response.json(
@@ -57,7 +54,7 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
-    // 其他调用失败（网络/超时/上游错误）-> 服务暂不可用（502）
+    // 网络/超时/上游错误 -> 服务暂不可用（502）
     return Response.json(
       { ok: false, error: "AI 服务暂不可用，请稍后重试。" },
       { status: 502 }

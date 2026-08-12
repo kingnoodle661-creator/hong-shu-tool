@@ -9,11 +9,18 @@
  *   结果审查Agent  ->  基于 Task + 处理前后摘要做程序化校验
  */
 
-/** 支持的任务操作类型（本阶段支持 group_sum / sum，其余为预留） */
-export type Operation = "group_sum" | "sum" | "unknown";
+/** 支持的任务操作类型（V0.5-A 扩展为全套办公操作） */
+export type Operation =
+  | "group_sum" // 分组求和
+  | "sum" // 简单求和
+  | "count" // 计数（可分组）
+  | "distinct" // 去重（按列/整行删除重复）
+  | "average" // 求平均（可分组的聚合方法之一）
+  | "max" // 最大值
+  | "min"; // 最小值
 
-/** 计算方式（本阶段仅支持求和） */
-export type CalculationMethod = "sum";
+/** 计算方式（V0.5-A 支持多种聚合方法） */
+export type CalculationMethod = "sum" | "avg" | "max" | "min" | "count";
 
 /** 一项计算：对某列执行某方法 */
 export interface Calculation {
@@ -47,7 +54,12 @@ export interface Task {
   keepHeader: boolean;
   /** 操作对应的工作表名称，缺省则取第一个工作表 */
   sheetName?: string;
-  /** 额外参数，后续扩展 */
+  /**
+   * 额外参数（V0.5-A）：
+   * - operation=distinct 时：`{ distinctBy: string }` 指定去重依据列（缺省取 groupBy[0] 或整行比对）；
+   * - operation=count 且无 calculations 时：`{ groupBy }` 已可表达按组计数；
+   * - 其余为空即可。
+   */
   options?: Record<string, unknown>;
 }
 
@@ -138,4 +150,84 @@ export interface VerificationSuite {
    * 前端可在"详情"折叠中展示。
    */
   details?: string[];
+}
+
+/* ------------------------------------------------------------------ */
+/* V0.5-A：Excel 表分析 Agent 与 需求澄清 Agent 的类型契约              */
+/* ------------------------------------------------------------------ */
+
+/** 可识别的表类型名称（前端展示用） */
+export type TableTypeName =
+  | "采购表"
+  | "销售表"
+  | "库存表"
+  | "财务表"
+  | "明细表"
+  | "通用表";
+
+/** 单个列的分析信息 */
+export interface TableColumnInfo {
+  /** 表头文本 */
+  header: string;
+  /** 推断的列类型：文本/数字/金额/日期 */
+  type: "text" | "number" | "amount" | "date";
+  /** 对字段含义的一句话提示（如"可能是商品名称"） */
+  hint?: string;
+}
+
+/** 推荐操作（表分析产出，供前端展示为可点按钮） */
+export interface RecommendedOp {
+  /** 按钮文案，如"按商品名称汇总" "把一样的合起来" */
+  label: string;
+  /** 该推荐是否可直接执行：task 存在则点击即生成任务；"describe" 表示需用户补充描述后走澄清 */
+  task: Task | "describe";
+}
+
+/** Excel 表分析 Agent 的完整产出（只读分析，不修改任何内容） */
+export interface TableAnalysis {
+  /** 机器可用的表类型 key（与 tableTypeName 对应） */
+  tableType: string;
+  /** 用户可读的表类型：如"采购表" */
+  tableTypeName: TableTypeName;
+  /** 逐列分析结果 */
+  columns: TableColumnInfo[];
+  /** 数据行数（不含表头） */
+  rowCount: number;
+  /** 分析的工作表名称（默认第一个） */
+  sheetName: string;
+  /** 前几行样例数据（供展示/兜底 AI 分析） */
+  sampleData: unknown[][];
+  /** 推荐操作列表 */
+  suggestions: RecommendedOp[];
+  /** 表类型识别方式：规则 / AI 兜底 */
+  matchedBy: "rule" | "ai";
+}
+
+/** 澄清面板中一个可点选的操作选项 */
+export interface ClarifyOption {
+  /** 选项文案，如"按商品名称合并汇总" */
+  label: string;
+  /** 选择后要执行的任务；缺省表示需进一步描述 */
+  task?: Task;
+}
+
+/** 需求澄清问题的对象结构 */
+export interface ClarifyQuestion {
+  /** 问题文案，如"您想如何整理这份表？" */
+  question: string;
+  /** 可选的答案选项 */
+  options: ClarifyOption[];
+}
+
+/**
+ * 需求理解 Agent 的返回结果（V0.5-A）。
+ * - status="ready"       需求足够具体可直接执行，携带 task；
+ * - status="need_confirm" 需求模糊，携带 questions 供前端引导澄清，不报错。
+ */
+export interface ClarifyResult {
+  status: "ready" | "need_confirm";
+  /** status="ready" 时为可执行的结构化任务 */
+  task?: Task;
+  /** status="need_confirm" 时为澄清问题列表 */
+  questions?: ClarifyQuestion[];
 }

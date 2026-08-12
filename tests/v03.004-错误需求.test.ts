@@ -34,11 +34,28 @@ test("错误需求：结构非法（非对象 / 非法 method）-> 拒绝或规�
   // 非对象
   assert.throws(() => parseAndValidateTask(null));
   assert.throws(() => parseAndValidateTask("not json"));
-  // method 非法 -> 该项被剔除，最终因无有效计算列被拒绝
+  // method 非法（不属于 sum/avg/max/min/count）-> 该项被剔除，最终因无有效计算列被拒绝
   assert.throws(
-    () => parseAndValidateTask({ operation: "sum", groupBy: [], calculations: [{ column: "金额", method: "avg" }] }),
+    () => parseAndValidateTask({ operation: "sum", groupBy: [], calculations: [{ column: "金额", method: "divide" }] }),
     /无法理解/
   );
+});
+
+test("合法需求（V0.5-A）：avg/max/min/count 为合法 method", () => {
+  const t = parseAndValidateTask({
+    operation: "average",
+    groupBy: [],
+    calculations: [{ column: "金额", method: "avg" }],
+  });
+  assert.equal(t.operation, "average");
+  assert.equal(t.calculations[0].method, "avg");
+
+  const m = parseAndValidateTask({
+    operation: "max",
+    groupBy: [],
+    calculations: [{ column: "金额", method: "max" }],
+  });
+  assert.equal(m.calculations[0].method, "max");
 });
 
 test("合法需求：规范化并保留字段", () => {
